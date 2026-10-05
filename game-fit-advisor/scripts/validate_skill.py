@@ -152,6 +152,46 @@ def parse_frontmatter(text: str, report: Report) -> Tuple[Dict[str, object], str
     return data, body
 
 
+def _frontmatter_lines(text: str) -> List[str]:
+    """取出 frontmatter 里的原始行（不含首尾 --- 分隔线）。"""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return []
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            return lines[1:index]
+    return []
+
+
+def check_yaml_scalar_safety(frontmatter_lines: List[str], report: Report) -> None:
+    """真实事故防线：未加引号的标量里出现 ": "（ASCII 冒号 + 空格）会让
+    YAML 解析失败，而加载器只会静默跳过该技能（只写日志，界面无任何提示）。
+    本项目的 description 曾因为结尾的 "English: Diagnose ..." 触发此问题，
+    导致技能装了却永远加载不出来。这里在解析阶段就拦住。
+    """
+    for index, raw in enumerate(frontmatter_lines, start=2):
+        line = raw.rstrip("\n")
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith((" ", "\t")):          # 嵌套值单独处理
+            nested = line.strip()
+            if ":" not in nested:
+                continue
+            _key, _, value = nested.partition(":")
+        else:
+            if ":" not in line:
+                continue
+            _key, _, value = line.partition(":")
+        value = value.strip()
+        if value.startswith(("'", '"', "|", ">")):  # 已加引号或用块标量：安全
+            continue
+        if ": " in value or value.endswith(":"):
+            report.error(
+                "frontmatter 第 %d 行：未加引号的值里出现 ASCII 冒号（%r...），"
+                "YAML 会解析失败、技能被静默忽略。请用单引号包裹整个值："
+                "key: '...'" % (index, value[:40]))
+
+
 def check_frontmatter(data: Dict[str, object], body: str, directory: str, report: Report,
                       check_name: bool = True) -> None:
     name = data.get("name")
@@ -283,6 +323,7 @@ def validate(directory: str, check_name: bool = True) -> Report:
     with open(skill_path, "r", encoding="utf-8") as handle:
         text = handle.read()
     data, body = parse_frontmatter(text, report)
+    check_yaml_scalar_safety(_frontmatter_lines(text), report)
     check_frontmatter(data, body, directory, report, check_name=check_name)
     check_files(directory, report)
     check_key_consistency(directory, report)

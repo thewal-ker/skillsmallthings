@@ -18,6 +18,7 @@
 | CI 12 秒失败：路径不存在 | workflow 假设的目录结构与仓库实际结构不一致 | 布局自适应 workflow + 离线复现 CI |
 | 公开仓库历史里出现真实邮箱 | GitHub 建仓自动提交使用账号邮箱 | `filter-branch` 重写 + 清理 + 强推 |
 | `--force-with-lease` 报 `stale info` | 本地 remote-tracking 引用被改写或过期 | 先强制对齐远程引用再强推 |
+| **技能装好了却永远加载不出来** | `description` 里未加引号的 **ASCII 冒号**（如结尾的 `English: ...`）导致 YAML 解析失败，加载器静默跳过 | 用单引号包裹整个值，或改用全角 `：` |
 
 细节见 [`references/troubleshooting.md`](references/troubleshooting.md)。
 
@@ -29,12 +30,12 @@ github-skill-publisher/
 ├── README.md  LICENSE
 ├── references/
 │   ├── publish-playbook.md                   # 逐步命令清单（含离线复现 CI）
-│   ├── troubleshooting.md                    # 症状 → 根因 → 判据 → 处置
+│   ├── troubleshooting.md                    # 八类陷阱：症状 → 根因 → 判据 → 处置
 │   └── privacy-and-history-rewrite.md        # 真名/真邮箱清理与历史改写
 └── scripts/
     ├── precheck.py                           # 推送前预检（本技能的核心工具）
     ├── commit_msg.py                         # 跨 shell 安全的提交信息工具
-    └── test_precheck.py                      # 34 项测试
+    └── test_precheck.py                      # 38 项测试
 ```
 
 ## 安装
@@ -98,7 +99,7 @@ python scripts/commit_msg.py build --title "feat: 首个技能" --commit   # 写
 ### 自检
 
 ```bash
-python -m unittest discover -s scripts -p "test_*.py"   # 34 项测试
+python -m unittest discover -s scripts -p "test_*.py"   # 38 项测试
 ```
 
 仓库已带 GitHub Actions（`.github/workflows/validate.yml`），在 Python 3.9 / 3.12 上跑上述测试。

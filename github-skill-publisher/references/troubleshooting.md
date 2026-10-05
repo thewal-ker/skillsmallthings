@@ -236,3 +236,48 @@ git push --force-with-lease origin main
 ```
 
 **判据**：`git rev-parse origin/main` 与 `git ls-remote origin refs/heads/main` 的哈希不一致 → 就是它。
+
+---
+
+## 陷阱 8 · 技能装好了却永远加载不出来（YAML 冒号）
+
+**症状**：文件位置、目录名、`name`、编码全都对，`skill <名字>` 却始终返回
+`unknown or no longer available`；重启应用、换会话都无效；界面上**没有任何报错**。
+
+**根因**：`SKILL.md` 的 frontmatter 是 YAML。**未加引号的标量里出现 ASCII 冒号**
+（尤其是 `: ` 冒号 + 空格，或值以 `:` 结尾）会让 YAML 解析失败。技能加载器遇到解析失败时
+只写一行日志然后 `return`：
+
+```js
+ctx.logger.warn(`skill file ${path} ignored: invalid YAML frontmatter: ...`);
+```
+
+——**静默跳过**：不报错、不提示、不进技能清单。
+
+实战案例：`description` 结尾写了英文标签
+
+```yaml
+description: ……也不代替用户做购买决定。English: Diagnose whether a specific video game fits a specific player……
+#                                                ↑ 这个 ": " 让整个技能失效
+```
+
+**判据**：在同一技能目录下做 A/B 对照——写一个只有 `name` + 简短 `description`（不含冒号）的
+探针技能。若探针出现在技能清单里而你的技能没有，就是 frontmatter 解析失败。
+（DSH 的技能清单带文件监听：新建或修改 `SKILL.md` 后清单会**立即刷新**，无需重启应用。）
+
+**处置**：二选一。
+
+```yaml
+# 方案 A（推荐）：用单引号包裹整个值，内部冒号就失去语法意义
+description: '……原文…… English: Diagnose whether ……'
+
+# 方案 B：把 ASCII 冒号换成全角冒号
+description: ……原文…… English：Diagnose whether ……
+```
+
+**预防**：`scripts/precheck.py --repo .` 会直接报出
+`frontmatter 第 N 行：未加引号的值里出现 ASCII 冒号`。同类风险字段还有
+`compatibility`、以及 `metadata` 下的自定义值（如 `note: see: the docs`）。
+
+**顺带一条运行时装法**：技能目录里可以有 `references/`、`assets/`、`scripts/`，但
+**`SKILL.md` 必须在被扫描根目录的第一层子目录里**；`**/SKILL.md`（再深一层）故意不被发现。

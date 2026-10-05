@@ -120,7 +120,7 @@ python scripts/diagnose.py --list-questions --mode 2
 ```bash
 # 本仓库是技能库（根目录名 skillsmallthings ≠ 技能名），所以显式指向技能目录
 python game-fit-advisor/scripts/validate_skill.py game-fit-advisor      # 结构与一致性校验（严格）
-python -m unittest discover -s game-fit-advisor/scripts -p "test_*.py"  # 48 项行为测试
+python -m unittest discover -s game-fit-advisor/scripts -p "test_*.py"  # 53 项行为测试
 ```
 
 也可以不带参数运行校验脚本：它会自动定位唯一的技能子目录，并放宽"目录名须等于 name"检查；显式传入技能目录时则严格校验该规则。

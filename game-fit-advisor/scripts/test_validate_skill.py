@@ -198,6 +198,51 @@ class TestCli(unittest.TestCase):
         self.assertEqual(self.run_cli([directory, "--name", "Bad_Name"]), 2)
 
 
+class TestYamlScalarSafety(unittest.TestCase):
+    """回归测试：未加引号的值里含 ASCII 冒号 → YAML 解析失败 → 技能被静默忽略。
+
+    真实事故：description 结尾写了 "English: Diagnose ..."，技能装好后
+    在任何会话里都加载不出来，加载器只在日志里 warn 一行。
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="skill-yaml-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def build(self, description_line):
+        return "---\nname: demo-skill\n%s\n---\n\n正文\n" % description_line
+
+    def test_unquoted_ascii_colon_is_error(self):
+        directory = make_skill(self.tmp, "demo-skill",
+                               self.build("description: 演示技能。English: Diagnose whether it fits."))
+        report = validate_skill.validate(directory)
+        self.assertTrue(any("ASCII 冒号" in message for message in report.errors), report.errors)
+
+    def test_trailing_ascii_colon_is_error(self):
+        directory = make_skill(self.tmp, "demo-skill", self.build("description: 演示技能，标签如下:"))
+        report = validate_skill.validate(directory)
+        self.assertTrue(any("ASCII 冒号" in message for message in report.errors), report.errors)
+
+    def test_single_quoted_value_is_safe(self):
+        directory = make_skill(self.tmp, "demo-skill",
+                               self.build("description: '演示技能。English: Diagnose whether it fits.'"))
+        report = validate_skill.validate(directory)
+        self.assertEqual([e for e in report.errors if "冒号" in e], [])
+
+    def test_fullwidth_colon_is_safe(self):
+        directory = make_skill(self.tmp, "demo-skill",
+                               self.build("description: 演示技能。English：Diagnose whether it fits."))
+        report = validate_skill.validate(directory)
+        self.assertEqual([e for e in report.errors if "冒号" in e], [])
+
+    def test_nested_metadata_value_checked(self):
+        text = ("---\nname: demo-skill\ndescription: 演示技能，说明足够长足够长足够长足够长足够长足够长\n"
+                "metadata:\n  note: see: the docs\n---\n\n正文\n")
+        directory = make_skill(self.tmp, "demo-skill", text)
+        report = validate_skill.validate(directory)
+        self.assertTrue(any("ASCII 冒号" in message for message in report.errors), report.errors)
+
+
 class TestRealPackage(unittest.TestCase):
     """对本仓库真实技能包做一次端到端校验。"""
 

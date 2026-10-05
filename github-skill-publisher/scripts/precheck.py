@@ -134,6 +134,45 @@ def parse_frontmatter(text: str):
     return data, "\n".join(lines[end + 1:]), None
 
 
+def check_yaml_scalar_safety(frontmatter_lines: List[str], report: "Report") -> None:
+    """真实事故：未加引号的标量里出现 ": "（ASCII 冒号 + 空格）会让 YAML 解析失败，
+    加载器只写日志、静默跳过该技能——界面上完全看不出问题。
+    本项目曾因 description 结尾写了 "English: Diagnose ..." 踩中，
+    结果技能装好了却永远加载不出来。这里在推送前就拦住。
+    """
+    for index, raw in enumerate(frontmatter_lines, start=2):
+        line = raw.rstrip("\n")
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith((" ", "\t")):
+            nested = line.strip()
+            if ":" not in nested:
+                continue
+            _key, _, value = nested.partition(":")
+        else:
+            if ":" not in line:
+                continue
+            _key, _, value = line.partition(":")
+        value = value.strip()
+        if value.startswith(("'", '"', "|", ">")):
+            continue
+        if ": " in value or value.endswith(":"):
+            report.error(
+                "frontmatter 第 %d 行：未加引号的值里出现 ASCII 冒号（%r...）；"
+                "YAML 会解析失败、技能被静默忽略。改用单引号包裹整个值：key: '...'"
+                % (index, value[:40]))
+
+
+def _frontmatter_lines(text: str) -> List[str]:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return []
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            return lines[1:index]
+    return []
+
+
 def check_skill_package(skill_dir: str, report: Report) -> Optional[Dict[str, object]]:
     skill_md = os.path.join(skill_dir, "SKILL.md")
     if not os.path.isfile(skill_md):
@@ -142,6 +181,7 @@ def check_skill_package(skill_dir: str, report: Report) -> Optional[Dict[str, ob
 
     with open(skill_md, "r", encoding="utf-8-sig") as handle:
         text = handle.read()
+    check_yaml_scalar_safety(_frontmatter_lines(text), report)
     data, body, error = parse_frontmatter(text)
     if error:
         report.error("SKILL.md frontmatter 解析失败：%s" % error)

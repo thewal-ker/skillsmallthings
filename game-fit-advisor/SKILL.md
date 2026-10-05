@@ -1,6 +1,6 @@
 ---
 name: game-fit-advisor
-description: 游戏适配度诊断顾问。当用户想判断某款游戏是否适合自己、问“这游戏适合我吗 / 值得入手吗 / 我会不会玩不下去 / 帮我选游戏”，或担心时间、难度、社交、付费、硬件、社区氛围等某一维度会踩坑时使用。通过场景化提问做快速玩法诊断（模块一，8 题）或深度全面分析（模块二，8 个深层维度），最后给出高/中/低适配结论与下一步行动建议（试玩、观望或放弃）。仅诊断“玩家与游戏的匹配度”，不评价游戏好坏，也不代替用户做购买决定。English: Diagnose whether a specific video game fits a specific player through scenario-based questioning, then report a high/medium/low fit verdict with a next-step recommendation.
+description: '游戏适配度诊断顾问。当用户想判断某款游戏是否适合自己、问“这游戏适合我吗 / 值得入手吗 / 我会不会玩不下去 / 帮我选游戏”，或担心时间、难度、社交、付费、硬件、社区氛围等某一维度会踩坑时使用。通过场景化提问做快速玩法诊断（模块一，8 题）或深度全面分析（模块二，8 个深层维度），最后给出高/中/低适配结论与下一步行动建议（试玩、观望或放弃）。仅诊断“玩家与游戏的匹配度”，不评价游戏好坏，也不代替用户做购买决定。English: Diagnose whether a specific video game fits a specific player through scenario-based questioning, then report a high/medium/low fit verdict with a next-step recommendation.'
 license: MIT
 compatibility: 纯提示词技能，无需网络与额外依赖。可选脚本仅依赖 Python 3.9+ 标准库；允许代理在需要核对游戏事实时使用联网检索工具。
 metadata:

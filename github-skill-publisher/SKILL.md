@@ -1,6 +1,6 @@
 ---
 name: github-skill-publisher
-description: 把一个本地 Agent Skill（含 SKILL.md 的目录）或提示词项目发布到 GitHub。当用户说“上传到 GitHub / 推到仓库 / 建仓库发布 skill / commit 并 push / 帮我提交到 GitHub”，或需要在推送前检查隐私信息（真名、真实邮箱）、修正提交作者、排查 push 被拒与 GitHub Actions 失败时使用。覆盖空仓库导致的 push 拒绝、rebase/merge 冲突、PowerShell 引号与编码陷阱、git 身份缺失、历史里的邮箱泄露、CI 路径与仓库结构不匹配等具体故障。English: Publish a local Agent Skill or prompt project to GitHub, including pre-publish privacy checks, commit-identity fixes, push-rejection and CI-failure troubleshooting.
+description: '把一个本地 Agent Skill（含 SKILL.md 的目录）或提示词项目发布到 GitHub。当用户说“上传到 GitHub / 推到仓库 / 建仓库发布 skill / commit 并 push / 帮我提交到 GitHub”，或需要在推送前检查隐私信息（真名、真实邮箱）、修正提交作者、排查 push 被拒与 GitHub Actions 失败时使用。覆盖空仓库导致的 push 拒绝、rebase/merge 冲突、PowerShell 引号与编码陷阱、git 身份缺失、历史里的邮箱泄露、CI 路径与仓库结构不匹配等具体故障。English: Publish a local Agent Skill or prompt project to GitHub, including pre-publish privacy checks, commit-identity fixes, push-rejection and CI-failure troubleshooting.'
 license: MIT
 compatibility: 需要本机已装 git 并能访问 GitHub；预检脚本仅依赖 Python 3.9+ 标准库。推送时会用到 GitHub 凭据（浏览器登录或 Personal Access Token）。
 metadata:
@@ -26,7 +26,7 @@ metadata:
 
 ## 铁律（违反必出事故）
 
-1. **先跑预检再提交**：`scripts/publish_prep.py --check`。它会扫出真名、"目录名≠name"、CI 路径不匹配、缺 LICENSE 等问题。本次事故全部由它覆盖。
+1. **先跑预检再提交**：`scripts/precheck.py --repo .`。它会扫出真名、"目录名≠name"、CI 路径不匹配、缺 LICENSE、**frontmatter 里的 YAML 冒号陷阱**等问题。本次事故全部由它覆盖。
 2. **不在命令行里塞多行文本**：提交信息、含引号/换行的字符串一律**写文件**再 `git commit -F`。PowerShell 解析会截断或报 `did not match any file(s) known to git`。
 3. **不把中文/多行内容用 PowerShell 重定向写文件**：会得到 UTF-8 BOM 或 UTF-16，导致脚本解析失败。用 `write` 工具或 Python 写。
 4. **推送前检查提交身份**：`git log --format='%an <%ae>'`。GitHub 建仓自带的 `Initial commit` 可能带**你的真实邮箱**。
@@ -38,10 +38,10 @@ metadata:
 ### 第 0 步：预检（推送前，必须做）
 
 ```bash
-python <skill>/scripts/publish_prep.py --check --skill-dir <skill-name>
+python <skill>/scripts/precheck.py --repo <仓库根> [--real-name 真名] [--real-email 邮箱]
 ```
 
-检查项：frontmatter 合规（`name` 与目录名一致、`description` 长度）、隐私词（真名，需 `--real-name` 传入）、历史中的真实邮箱、`.gitignore`/`LICENSE` 是否存在、CI 配置里的脚本路径是否与仓库结构一致、是否有临时产物（`*.json`、`__pycache__`）。
+检查项：frontmatter 合规（`name` 与目录名一致、`description` 长度、**未加引号的值里是否含 ASCII 冒号**）、隐私词（真名，需 `--real-name` 传入）、文件和历史中的真实邮箱、`.gitignore` / `LICENSE` / `.gitattributes` 是否存在、CI 配置里的脚本路径是否与仓库结构一致、是否有临时产物（`__pycache__`、试跑产物 JSON、日志）。
 
 把报告里的**每个 [错误] 都修掉**再继续；`[警告]` 逐条判断是否接受。
 
@@ -130,7 +130,7 @@ git log origin/main --format="%h %an <%ae>"   # 远程提交身份
 4. **重新抓取远程引用**，再 `git push --force-with-lease origin main`。
 5. 用 `git log --all` 复查 `@163.com` / `@qq.com` 等真实邮箱是否彻底消失。
 
-## 七类陷阱速查
+## 八类陷阱速查
 
 细节、判据与恢复命令见 `references/troubleshooting.md`。
 
@@ -143,6 +143,7 @@ git log origin/main --format="%h %an <%ae>"   # 远程提交身份
 | 5 | `Author identity unknown` / `Committer identity unknown` | `user.name`/`user.email` 未配置（`--amend`、`rebase` 也会要求） | `git config user.email` 配仓库级身份 |
 | 6 | CI 12 秒失败：`can't open file '.../scripts/x.py'` | workflow 假设的目录结构与仓库实际结构不一致 | 加"检测布局"步骤；本地离线复现 CI |
 | 7 | 公开仓库的提交历史里出现真实邮箱 | GitHub 建仓自动提交使用账号邮箱 | `filter-branch` 重写 + 清理 + 强推，见第 6 步 |
+| 8 | 技能装好了、目录也对，但**任何会话都加载不出来** | `description` 等标量**未加引号却含 ASCII 冒号**（如结尾的 `English: ...`），YAML 解析失败，加载器只写日志、静默跳过 | 用**单引号**包裹整个值：`description: '...English: ...'`；或把 `: ` 改成全角 `：` |
 
 ## 禁止事项
 
