@@ -5,6 +5,7 @@
 | 技能 | 说明 |
 |---|---|
 | [`game-fit-advisor`](#game-fit-advisor--游戏适配度诊断顾问) | 游戏适配度诊断顾问：判断某款游戏是否适合你 |
+| [`github-skill-publisher`](#github-skill-publisher--github-技能发布助手) | GitHub 技能发布助手：推送前预检隐私与结构、排查 push 被拒与 CI 失败 |
 
 ---
 
@@ -177,3 +178,44 @@ python -m unittest discover -s game-fit-advisor/scripts -p "test_*.py"  # 48 项
 MIT，见 [LICENSE](LICENSE)。
 
 本技能是**决策辅助**，不是专业建议：结论基于用户自述偏好与顾问对游戏设计的理解，游戏事实请以官方商店页、最新公告与实机体验为准。涉及现实支出、家庭关系或未成年人的场景，请自行判断。
+
+---
+
+# github-skill-publisher · GitHub 技能发布助手
+
+把"把一个技能推上 GitHub"这件事本身也做成了技能。它不是 `git push` 的包装，而是把发布过程中**真正会卡住人的环节**变成可执行的检查与恢复步骤。
+
+**它内置的预检工具**（`precheck.py`）在推送前扫描：
+
+- `SKILL.md` 合规：`name` 字符集与长度、**目录名必须等于 name**、`description` 长度
+- **CI 里引用的脚本路径在仓库里是否真的存在** —— 这正是本仓库当初 CI 红叉的根因
+- 仓库根 `README.md` / `.gitignore` / `.gitattributes` 是否齐全
+- 文件里的真名、真实邮箱；**提交历史里是否混入真实邮箱**
+- 是否把 `__pycache__`、试跑产物 JSON、日志等临时文件提交进了仓库
+
+**它记录的七类真实故障**（每类都给出判据与恢复命令）：
+
+| 症状 | 根因 |
+|---|---|
+| `! [rejected] main -> main (fetch first)` | 建仓时勾了 README，远程非空且历史无关 |
+| 变基后自己的 README 被远程桩文件覆盖 | `rebase -X ours` 的 "ours" 指**上游**那一侧 |
+| 命令报语法错误 / `did not match any file(s) known to git` | PowerShell 吃掉引号、拆散多行参数 |
+| 脚本解析失败、首字符是 `\ufeff` | PowerShell 重定向写了 BOM / UTF-16 |
+| `Author identity unknown` | `user.name/email` 未配置（`--amend`、`rebase` 同样要求） |
+| CI 12 秒失败：路径不存在 | workflow 假设的目录结构与仓库实际结构不一致 |
+| 公开仓库历史里出现真实邮箱 | GitHub 建仓自动提交使用账号邮箱 |
+
+另附 `commit_msg.py`：以 UTF-8 无 BOM + LF 写提交信息再用 `git commit -F` 提交，一次避开"引号"与"编码"两个坑。
+
+- 入口：[`github-skill-publisher/SKILL.md`](github-skill-publisher/SKILL.md)
+- 逐步命令清单：[`references/publish-playbook.md`](github-skill-publisher/references/publish-playbook.md)
+- 故障速查：[`references/troubleshooting.md`](github-skill-publisher/references/troubleshooting.md)
+- 隐私与历史改写：[`references/privacy-and-history-rewrite.md`](github-skill-publisher/references/privacy-and-history-rewrite.md)
+
+```bash
+# 推送前预检（本仓库）
+python github-skill-publisher/scripts/precheck.py --repo .
+python -m unittest discover -s github-skill-publisher/scripts -p "test_*.py"
+```
+
+MIT，见 [LICENSE](github-skill-publisher/LICENSE)。

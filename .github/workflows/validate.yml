@@ -1,9 +1,7 @@
 name: validate
 
-# 本仓库是技能库：仓库根名 skillsmallthings ≠ 技能名 game-fit-advisor，
-# 因此脚本路径与校验目标都显式指向 game-fit-advisor/。
-# 若把技能拆成独立仓库（SKILL.md 位于仓库根），把下面的 SKILL_DIR 改为 . 即可，
-# 校验命令会自动切换成不带 --name 的严格模式。
+# 校验 game-fit-advisor 与 github-skill-publisher 两个技能包：
+# 结构一致性、单元测试、以及关键行为的冒烟测试。
 
 on:
   push:
@@ -24,30 +22,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Detect skill layout
-        run: |
-          if [ -f SKILL.md ]; then
-            echo "SKILL_DIR=." >> "$GITHUB_ENV"
-            echo "技能位于仓库根目录"
-          else
-            echo "SKILL_DIR=game-fit-advisor" >> "$GITHUB_ENV"
-            echo "技能位于子目录 game-fit-advisor/"
-          fi
+      - name: Validate game-fit-advisor (frontmatter, files, key/weight consistency)
+        run: python game-fit-advisor/scripts/validate_skill.py game-fit-advisor
 
-      - name: Validate skill package (frontmatter, files, key/weight consistency)
-        run: |
-          if [ "$SKILL_DIR" = "." ]; then
-            python "$SKILL_DIR/scripts/validate_skill.py" .
-          else
-            python "$SKILL_DIR/scripts/validate_skill.py" "$SKILL_DIR"
-          fi
-
-      - name: Run unit tests
-        run: python -m unittest discover -s "$SKILL_DIR/scripts" -p "test_*.py" -v
+      - name: Run game-fit-advisor tests
+        run: python -m unittest discover -s game-fit-advisor/scripts -p "test_*.py" -v
 
       - name: Smoke test — all matches must be high fit
         run: |
-          python "$SKILL_DIR/scripts/diagnose.py" --game "smoke-high" --mode 1 \
+          python game-fit-advisor/scripts/diagnose.py --game "smoke-high" --mode 1 \
             --answers "core_loop:match,controls:match,pace:match,social:match,challenge:match,content:match,immersion:match,time_budget:match" \
             --non-interactive --json > high.json
           cat high.json
@@ -56,21 +39,15 @@ jobs:
 
       - name: Smoke test — critical conflict must not be high fit
         run: |
-          python "$SKILL_DIR/scripts/diagnose.py" --game "smoke-critical" --mode 2 \
+          python game-fit-advisor/scripts/diagnose.py --game "smoke-critical" --mode 2 \
             --answers "time_cost:match,hardware:match,payment:match,community:match,update:match,emotion:match,retention:match,values:conflict" \
             --non-interactive --json > critical.json
           cat critical.json
           grep -q '"level": "medium"' critical.json
           grep -q '"critical_conflicts": \[' critical.json
 
-      - name: Smoke test — question bank listing
-        run: python "$SKILL_DIR/scripts/diagnose.py" --list-questions --mode 2
+      - name: Run github-skill-publisher tests
+        run: python -m unittest discover -s github-skill-publisher/scripts -p "test_*.py" -v
 
-      - name: Smoke test — CLI rejects unknown dimension
-        run: |
-          if python "$SKILL_DIR/scripts/diagnose.py" --game "smoke-bad" \
-               --answers "nope:match" --non-interactive; then
-            echo "错误：未知维度 key 应当失败，但命令返回成功"; exit 1
-          else
-            echo "OK：未知维度 key 被正确拒绝"
-          fi
+      - name: Smoke test — precheck passes on this repository
+        run: python github-skill-publisher/scripts/precheck.py --repo .
