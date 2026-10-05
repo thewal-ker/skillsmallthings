@@ -1,0 +1,44 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Validate skill package (frontmatter, files, key/weight consistency)
+        run: python scripts/validate_skill.py .
+
+      - name: Run diagnose.py tests
+        run: python -m unittest discover -s scripts -p "test_*.py" -v
+
+      - name: Smoke test — high fit
+        run: |
+          python scripts/diagnose.py --game "smoke-high" --mode 1 \
+            --answers "core_loop:match,controls:match,pace:match,social:match,challenge:match,content:match,immersion:match,time_budget:match" \
+            --non-interactive --json | tee high.json
+          grep -q '"level": "high"' high.json
+
+      - name: Smoke test — critical conflict forces non-high verdict
+        run: |
+          python scripts/diagnose.py --game "smoke-critical" --mode 2 \
+            --answers "time_cost:match,hardware:match,payment:match,community:match,update:match,emotion:match,retention:match,values:conflict" \
+            --non-interactive --json | tee critical.json
+          grep -q '"level": "medium"' critical.json
+          grep -q '"values"' critical.json
+
+      - name: Smoke test — question bank listing
+        run: python scripts/diagnose.py --list-questions --mode 2
