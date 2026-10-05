@@ -4,7 +4,7 @@ description: 游戏适配度诊断顾问。当用户想判断某款游戏是否�
 license: MIT
 compatibility: 纯提示词技能，无需网络与额外依赖。可选脚本仅依赖 Python 3.9+ 标准库；允许代理在需要核对游戏事实时使用联网检索工具。
 metadata:
-  author: 朱希贤
+  author: thewal-ker
   version: "1.0.0"
   language: zh-CN
   tags: 游戏, 适配度, 决策咨询, 问卷诊断, game-fit
