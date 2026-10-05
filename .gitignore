@@ -11,6 +11,10 @@ reports/
 *.report.md
 answers.local.txt
 
+# 冒烟测试 / 本地试跑产生的中间文件
+high.json
+critical.json
+
 # 编辑器 / 系统
 .vscode/
 .idea/

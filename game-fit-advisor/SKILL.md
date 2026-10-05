@@ -143,7 +143,10 @@ python scripts/diagnose.py --game "星穹铁道" --mode 1 \
 python scripts/diagnose.py --list-questions --mode 2
 
 # 校验本技能包结构是否符合 Agent Skills 规范
+# 在技能目录内运行（目录名须等于 name）：
 python scripts/validate_skill.py .
+# 在技能库仓库根运行（仓库根名与技能名不同），显式指定技能名：
+python scripts/validate_skill.py . --name game-fit-advisor
 ```
 
 脚本输出仅作为判定参考，**最终结论仍由你结合用户的追问回答给出**；两者不一致时，以你掌握的完整对话信息为准，并在报告中说明差异。

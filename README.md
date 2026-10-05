@@ -35,23 +35,27 @@
 ## 目录结构
 
 ```text
-game-fit-advisor/
-├── SKILL.md                        # 技能入口：角色、工作流、六步执行顺序
-├── README.md
-├── LICENSE                         # MIT
-├── .gitignore
-├── references/
-│   ├── question-bank.md            # 16 个维度：问法 + 判定线索 + 追问
-│   ├── scoring-rubric.md           # 权重、公式、三档阈值、强制覆盖、措辞模板
-│   ├── interaction-rules.md        # 动态调整、追问上限、边界与免责
-│   └── original-prompt.md          # 原始提示词存档 + 改动清单
-├── assets/
-│   ├── report-template.md          # 高/中/低三份完整报告范例 + 格式硬要求
-│   └── sample-session.md           # 两个模块的完整对话范例（风格基准）
-└── scripts/
-    ├── diagnose.py                 # 交互式诊断 / 直接算分 / 生成报告
-    ├── test_diagnose.py            # 26 项行为测试（unittest，纯标准库）
-    └── validate_skill.py           # 校验包结构与文档-脚本一致性
+skillsmallthings/                   # 仓库根：只放仓库级文件
+├── README.md                       # 本文件（仓库首页）
+├── .gitignore  .gitattributes
+├── .github/workflows/validate.yml  # CI：Python 3.9 / 3.12 上校验 + 测试 + 冒烟测试
+└── game-fit-advisor/               # ← 技能包本体，整个目录复制到技能目录即可
+    ├── SKILL.md                    # 技能入口：角色、工作流、六步执行顺序
+    ├── README.md                   # 技能包内说明（GitHub 上可见）
+    ├── LICENSE                     # MIT
+    ├── references/
+    │   ├── question-bank.md        # 16 个维度：问法 + 判定线索 + 追问
+    │   ├── scoring-rubric.md       # 权重、公式、三档阈值、强制覆盖、措辞模板
+    │   ├── interaction-rules.md    # 动态调整、追问上限、边界与免责
+    │   └── original-prompt.md      # 原始提示词存档 + 改动清单
+    ├── assets/
+    │   ├── report-template.md      # 高/中/低三份完整报告范例 + 格式硬要求
+    │   └── sample-session.md       # 两个模块的完整对话范例（风格基准）
+    └── scripts/
+        ├── diagnose.py             # 交互式诊断 / 直接算分 / 生成报告
+        ├── validate_skill.py       # 校验包结构与文档-脚本一致性
+        ├── test_diagnose.py        # 26 项判定逻辑测试
+        └── test_validate_skill.py  # 22 项校验器测试（含目录名规则回归）
 ```
 
 ---
@@ -113,11 +117,14 @@ python scripts/diagnose.py --list-questions --mode 2
 ### 自检
 
 ```bash
-python scripts/validate_skill.py .                      # 结构与一致性校验
-python -m unittest discover -s scripts -p "test_*.py"   # 行为测试
+# 本仓库是技能库（根目录名 skillsmallthings ≠ 技能名），所以显式指向技能目录
+python game-fit-advisor/scripts/validate_skill.py game-fit-advisor      # 结构与一致性校验（严格）
+python -m unittest discover -s game-fit-advisor/scripts -p "test_*.py"  # 48 项行为测试
 ```
 
-校验 frontmatter 规范符合性、必需文件、以及 **维度 key 与权重在题库、评分标准、脚本三处是否一致**。修改任何一处后都应重跑。仓库已带 GitHub Actions（`.github/workflows/validate.yml`），在 Python 3.9 与 3.12 上跑校验、测试与冒烟测试。
+也可以不带参数运行校验脚本：它会自动定位唯一的技能子目录，并放宽"目录名须等于 name"检查；显式传入技能目录时则严格校验该规则。
+
+校验 frontmatter 规范符合性、目录名规则、推荐文件、以及 **维度 key 与权重在题库、评分标准、脚本三处是否一致**。修改任何一处后都应重跑。仓库已带 GitHub Actions（`.github/workflows/validate.yml`），在 Python 3.9 与 3.12 上跑校验、测试与冒烟测试。
 
 ---
 

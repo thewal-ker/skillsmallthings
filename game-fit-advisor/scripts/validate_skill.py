@@ -6,16 +6,20 @@
 
 用法：
 
-    python validate_skill.py            # 校验当前目录
-    python validate_skill.py .          # 校验指定技能目录
-    python validate_skill.py . --json   # 机器可读输出
+    python validate_skill.py                            # 自动定位技能目录；放宽目录名要求
+    python validate_skill.py ./game-fit-advisor         # 校验技能目录（目录名须等于 name）
+    python validate_skill.py ./game-fit-advisor --json  # 机器可读输出
+    python validate_skill.py . --name game-fit-advisor  # 显式给技能名，放宽目录名要求
+
+不带目录参数时：先看当前目录有没有 SKILL.md，没有则找唯一的、含 SKILL.md 的一级子目录。
+因此技能库仓库（仓库根名 ≠ 技能名）可以直接在根目录运行本脚本。
 
 校验内容：
   1. SKILL.md 存在，frontmatter 为合法 YAML 子集，字段名/取值符合规范
-  2. name 与目录名一致，字符集与长度合规
+  2. name 与所在目录名一致（不带目录参数或用 --name 时跳过）
   3. description 非空、长度合规
   4. SKILL.md 正文行数建议上限
-  5. 包内必需文件存在
+  5. 本技能包约定的推荐文件是否齐全（缺失为警告）
   6. 维度 key 在 question-bank.md / scoring-rubric.md / scripts/diagnose.py 三方一致
 """
 
@@ -47,6 +51,7 @@ REQUIRED_FILES = [
     "assets/report-template.md",
     "scripts/diagnose.py",
     "scripts/test_diagnose.py",
+    "scripts/test_validate_skill.py",
     "scripts/validate_skill.py",
 ]
 
@@ -147,7 +152,8 @@ def parse_frontmatter(text: str, report: Report) -> Tuple[Dict[str, object], str
     return data, body
 
 
-def check_frontmatter(data: Dict[str, object], body: str, directory: str, report: Report) -> None:
+def check_frontmatter(data: Dict[str, object], body: str, directory: str, report: Report,
+                      check_name: bool = True) -> None:
     name = data.get("name")
     if not isinstance(name, str) or not name:
         report.error("frontmatter 缺少必填字段 name")
@@ -157,8 +163,12 @@ def check_frontmatter(data: Dict[str, object], body: str, directory: str, report
         if not NAME_PATTERN.match(name):
             report.error("name 只允许小写字母、数字与单连字符：%r" % name)
         dirname = os.path.basename(os.path.abspath(directory))
-        if dirname != name:
-            report.error("name（%s）必须与父目录名（%s）一致" % (name, dirname))
+        if not check_name:
+            report.info("已跳过目录名校验（技能库仓库模式：根目录名与技能名可以不同）")
+        elif dirname != name:
+            # 显式指定了技能目录，就按规范严格要求：安装时可被直接复制/软链到技能目录下。
+            report.error("name（%s）必须与所在目录名（%s）一致；"
+                         "技能库仓库请改用 validate_skill.py . --name %s" % (name, dirname, name))
         else:
             report.info("name 与目录名一致：%s" % name)
 
@@ -194,13 +204,15 @@ def check_frontmatter(data: Dict[str, object], body: str, directory: str, report
 # --------------------------------------------------------------------------
 
 def check_files(directory: str, report: Report) -> None:
+    """检查技能包内容。缺失项记为警告：规范只强制要求 SKILL.md，
+    其余是本技能包的约定；在技能库仓库里对根目录校验时它们本就不存在。"""
     for relative in REQUIRED_FILES:
         path = os.path.join(directory, relative)
         if not os.path.isfile(path):
-            report.error("缺少必需文件：%s" % relative)
+            report.warn("缺少推荐文件：%s" % relative)
     for relative in ("references", "assets", "scripts"):
         if not os.path.isdir(os.path.join(directory, relative)):
-            report.error("缺少目录：%s/" % relative)
+            report.warn("缺少推荐目录：%s/" % relative)
 
 
 def check_key_consistency(directory: str, report: Report) -> None:
@@ -262,7 +274,7 @@ def check_readme(directory: str, report: Report) -> None:
         report.warn("README.md 未提到 SKILL.md，使用者可能不知道入口文件")
 
 
-def validate(directory: str) -> Report:
+def validate(directory: str, check_name: bool = True) -> Report:
     report = Report()
     skill_path = os.path.join(directory, "SKILL.md")
     if not os.path.isfile(skill_path):
@@ -271,11 +283,34 @@ def validate(directory: str) -> Report:
     with open(skill_path, "r", encoding="utf-8") as handle:
         text = handle.read()
     data, body = parse_frontmatter(text, report)
-    check_frontmatter(data, body, directory, report)
+    check_frontmatter(data, body, directory, report, check_name=check_name)
     check_files(directory, report)
     check_key_consistency(directory, report)
     check_readme(directory, report)
     return report
+
+
+def find_skill_dir(directory: str) -> Optional[str]:
+    """在目录下定位技能包：优先当前目录，其次唯一的含 SKILL.md 的一级子目录。
+
+    便于在技能库仓库根直接运行 `python <skill>/scripts/validate_skill.py`。
+    """
+    if os.path.isfile(os.path.join(directory, "SKILL.md")):
+        return directory
+    try:
+        entries = sorted(os.listdir(directory))
+    except OSError:
+        return None
+    candidates = [
+        os.path.join(directory, name)
+        for name in entries
+        if not name.startswith(".")
+        and os.path.isdir(os.path.join(directory, name))
+        and os.path.isfile(os.path.join(directory, name, "SKILL.md"))
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -287,12 +322,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     parser = argparse.ArgumentParser(prog="validate_skill.py",
                                      description="校验 Agent Skills 技能包结构与一致性")
-    parser.add_argument("directory", nargs="?", default=".", help="技能目录（默认为当前目录）")
+    parser.add_argument("directory", nargs="?",
+                        help="技能目录（省略时校验当前目录，并按技能库仓库模式跳过目录名校验）")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出")
+    parser.add_argument("--name", metavar="NAME",
+                        help="以 NAME 作为技能名校验，并跳过“目录名必须等于 name”检查。"
+                             "用于校验技能库仓库中的技能（如 validate_skill.py . --name game-fit-advisor）")
     args = parser.parse_args(argv)
 
-    directory = os.path.abspath(args.directory)
-    report = validate(directory)
+    # 显式给了目录 → 严格按规范校验（目录名必须等于 name）；
+    # 没给目录或显式 --name → 按技能库仓库模式放宽目录名要求。
+    check_name = True
+    directory = os.path.abspath(args.directory or ".")
+    if args.directory is None:
+        check_name = False
+        discovered = find_skill_dir(directory)
+        if discovered:
+            directory = discovered
+    if args.name:
+        check_name = False
+        if not NAME_PATTERN.match(args.name):
+            print("参数错误：--name 只允许小写字母、数字与单连字符：%r" % args.name, file=sys.stderr)
+            return 2
+    report = validate(directory, check_name=check_name)
+    if args.name:
+        report.info("校验目标技能名（--name）：%s" % args.name)
 
     if args.json:
         print(json.dumps({
